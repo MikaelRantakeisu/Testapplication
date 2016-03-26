@@ -5,7 +5,7 @@ package application.test.testapplication;
  */
 public class GenerateUrl {
 
-    static String baseUrl = "https://api.foursquare.com/v2/venues/search ?";
+    static String baseUrl = "https://api.foursquare.com/v2/venues/search?";
 
    public static String clientId(String CLIENT_ID, String secred, String version, String location, String searchWord){
       String url = baseUrl+"client_id="+CLIENT_ID+"&client_secret="+secred+"&v="+version+"&ll="+location+ "&query="+searchWord;

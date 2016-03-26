@@ -1,9 +1,11 @@
 package application.test.testapplication;
 
 import android.Manifest;
+import android.app.ProgressDialog;
 import android.content.Context;
 import android.content.pm.PackageManager;
 import android.location.Location;
+import android.location.LocationManager;
 import android.net.ConnectivityManager;
 import android.net.NetworkInfo;
 import android.os.AsyncTask;
@@ -17,14 +19,21 @@ import android.util.Log;
 import android.view.View;
 import android.view.Menu;
 import android.view.MenuItem;
+import android.widget.ArrayAdapter;
 import android.widget.EditText;
+import android.widget.ListView;
 import android.widget.Toast;
 
 import com.google.android.gms.common.ConnectionResult;
 import com.google.android.gms.common.GooglePlayServicesUtil;
-import com.google.android.gms.common.api.GoogleApiClient;
-import com.google.android.gms.location.LocationRequest;
-import com.google.android.gms.location.LocationServices;
+
+import android.location.Location;
+import android.location.LocationListener;
+import android.location.LocationManager;
+
+import org.json.JSONArray;
+import org.json.JSONException;
+import org.json.JSONObject;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -33,23 +42,16 @@ import java.io.Reader;
 import java.io.UnsupportedEncodingException;
 import java.net.HttpURLConnection;
 import java.net.URL;
+import java.util.ArrayList;
 
-public class MainActivity extends AppCompatActivity implements GoogleApiClient.ConnectionCallbacks,
-        GoogleApiClient.OnConnectionFailedListener {
+public class MainActivity extends AppCompatActivity {
 
     private static final String TAG = MainActivity.class.getSimpleName();
 
     private final static int PLAY_SERVICES_RESOLUTION_REQUEST = 1000;
 
-    private Location mLastLocation;
+    LocationListener locationListener;
 
-    // Google client to interact with Google API
-    private GoogleApiClient mGoogleApiClient;
-
-    // boolean flag to toggle periodic location updates
-    private boolean mRequestingLocationUpdates = false;
-
-    private LocationRequest mLocationRequest;
 
     // Location updates intervals in sec
     private static int UPDATE_INTERVAL = 10000; // 10 sec
@@ -58,6 +60,15 @@ public class MainActivity extends AppCompatActivity implements GoogleApiClient.C
 
     private EditText seachWord = null;
     private String locationAsText = null;
+    private Location location = null;
+
+    private final static String CLIENT_ID = "PE2P5S2CNYYRHSNSLSQLVXLKKMY4SLZ3F4R1P0QKLR3EOCK2";
+    private final static String SECRED = "WBOYILZ2CDNJWR2GON0Z0IULVTAVI1MMVKZLZME3JX44FJ1A";
+    private final static String VERSION = "20140806";
+
+    private ArrayList <Venues> venuesArray = new ArrayList<Venues>();
+
+    ProgressDialog dialog;
 
 
     @Override
@@ -76,13 +87,16 @@ public class MainActivity extends AppCompatActivity implements GoogleApiClient.C
             // display error
         }
 
-       // LocationManager locationManager = (LocationManager) getSystemService(Context.LOCATION_SERVICE);
+        // LocationManager locationManager = (LocationManager) getSystemService(Context.LOCATION_SERVICE);
 
+        dialog = ProgressDialog.show(this, "Loading", "Please wait...", true);
+
+        dialog.dismiss();
 
         if (checkPlayServices()) {
 
             // Building the GoogleApi client
-            buildGoogleApiClient();
+
         }
 
         if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED && ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
@@ -95,23 +109,53 @@ public class MainActivity extends AppCompatActivity implements GoogleApiClient.C
             // for ActivityCompat#requestPermissions for more details.
             return;
         }
-        mLastLocation = LocationServices.FusedLocationApi
-                .getLastLocation(mGoogleApiClient);
 
         getLocation();
 
-        seachWord = (EditText)findViewById(R.id.the_word);
+        seachWord = (EditText) findViewById(R.id.the_word);
 
 
 
-        FloatingActionButton fab = (FloatingActionButton) findViewById(R.id.fab);
+        /*FloatingActionButton fab = (FloatingActionButton) findViewById(R.id.fab);
         fab.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
                 Snackbar.make(view, "Replace with your own action", Snackbar.LENGTH_LONG)
                         .setAction("Action", null).show();
             }
-        });
+        });*/
+
+
+        LocationManager locationManager = (LocationManager) this.getSystemService(Context.LOCATION_SERVICE);
+
+        getLocation();
+
+        locationListener = new LocationListener() {
+            public void onLocationChanged(Location location2) {
+                // Called when a new location is found by the network location provider.
+                //location.distanceTo(location);
+
+                if (location != null) {
+
+                    location = location2;
+                }
+            }
+
+            public void onStatusChanged(String provider, int status, Bundle extras) {
+
+            }
+
+            public void onProviderEnabled(String provider) {
+            }
+
+            public void onProviderDisabled(String provider) {
+            }
+        };
+
+
+        Long minute = 60000L;
+        Float distance = 300f;
+        locationManager.requestLocationUpdates(LocationManager.NETWORK_PROVIDER, minute, distance, locationListener);
 
     }
 
@@ -152,7 +196,73 @@ public class MainActivity extends AppCompatActivity implements GoogleApiClient.C
         // onPostExecute displays the results of the AsyncTask.
         @Override
         protected void onPostExecute(String result) {
-            //textView.setText(result);
+            //result.length();
+
+            try {
+
+                JSONObject jsonObject = new JSONObject(result);
+
+                String response = jsonObject.getString("response");
+
+                jsonObject = new JSONObject(response);
+
+                String venues = jsonObject.getString("venues");
+
+                //jsonObject = new JSONObject(venues);
+
+                JSONArray jsonArray = new JSONArray(venues);
+                for (int i=0; i < jsonArray.length(); i++) {
+                    Venues venue = new Venues();  // create a new object here
+                    JSONObject jpersonObj = jsonArray.getJSONObject(i);
+
+                    venue.setId((String) jpersonObj.getString("id"));
+                    venue.setName((String) jpersonObj.getString("name"));
+                    venue.setName((String) jpersonObj.getString("name"));
+
+                    String locationText = jpersonObj.getString("location");
+                    if(locationText!=null){
+
+                        JSONObject locationJson = new JSONObject(locationText);
+
+                        venue.setDistance(Double.parseDouble(locationJson.getString("distance")));
+
+                        venue.setAddress(locationJson.getString("formattedAddress"));
+
+                        String longitude = locationJson.getString("lng");
+                        String latitude = locationJson.getString("lat");
+
+                        Location location = new Location("GPS");
+                        location.setLongitude(Double.parseDouble(longitude));
+                        location.setLatitude(Double.parseDouble(latitude));
+
+                        venue.setLocation(location);
+                    }
+                    venuesArray.add(venue);
+                }
+
+                venuesArray.size();
+                //JSONObject json = new JSONObject(result);
+            } catch (JSONException e) {
+                e.printStackTrace();
+            }
+
+            // Get ListView object from xml
+            ListView listView = (ListView) findViewById(R.id.list);
+
+            // Defined Array values to show in ListView
+            String[] values = new String[venuesArray.size()] ;
+
+            for(int i = 0; i< venuesArray.size();i++){
+                values[i] = "Nimi:"+venuesArray.get(i).getName()+" Osoite:"+venuesArray.get(i).getAddress()+" Etäisyys:"+Double.toString(venuesArray.get(i).getDistance());
+            }
+
+            ArrayAdapter<String> adapter = new ArrayAdapter<String>(getApplicationContext(),
+                    android.R.layout.simple_list_item_1, android.R.id.text1, values);
+                    //textView.setText(result);
+
+            listView.setAdapter(adapter);
+
+            dialog.dismiss();
         }
     }
 
@@ -165,16 +275,16 @@ public class MainActivity extends AppCompatActivity implements GoogleApiClient.C
         InputStream is = null;
         // Only display the first 500 characters of the retrieved
         // web page content.
-        int len = 500;
+        int len = 1200;
 
-        String urlText = GenerateUrl.clientId("100", "hei", "3232", locationAsText, seachWord);
+        String urlText = GenerateUrl.clientId(CLIENT_ID, SECRED, VERSION, locationAsText, seachWord);
 
         try {
             URL url = new URL(urlText);
             HttpURLConnection conn = (HttpURLConnection) url.openConnection();
             conn.setReadTimeout(10000 /* milliseconds */);
             conn.setConnectTimeout(15000 /* milliseconds */);
-            conn.setRequestMethod("GET");
+            conn.setRequestMethod("POST");
             conn.setDoInput(true);
             // Starts the query
             conn.connect();
@@ -183,7 +293,7 @@ public class MainActivity extends AppCompatActivity implements GoogleApiClient.C
             is = conn.getInputStream();
 
             // Convert the InputStream into a string
-            String contentAsString = readIt(is, len);
+            String contentAsString = getASCIIContent(is);
             return contentAsString;
 
             // Makes sure that the InputStream is closed after the app is
@@ -195,46 +305,26 @@ public class MainActivity extends AppCompatActivity implements GoogleApiClient.C
         }
     }
 
-    // Reads an InputStream and converts it to a String.
-    public String readIt(InputStream stream, int len) throws IOException, UnsupportedEncodingException {
-        Reader reader = null;
-        reader = new InputStreamReader(stream, "UTF-8");
-        char[] buffer = new char[len];
-        reader.read(buffer);
-        return new String(buffer);
+    protected String getASCIIContent(InputStream is) throws IllegalStateException, IOException {
+        InputStream in = is;
+        StringBuffer out = new StringBuffer();
+        int n = 1;
+        while (n > 0) {
+            byte[] b = new byte[4096];
+            n = in.read(b);
+            if (n > 0) out.append(new String(b, 0, n));
+        }
+        return out.toString();
     }
 
     /**
      * Creating google api client object
      * */
-    protected synchronized void buildGoogleApiClient() {
-        mGoogleApiClient = new GoogleApiClient.Builder(this)
-                .addConnectionCallbacks(this)
-                .addOnConnectionFailedListener(this)
-                .addApi(LocationServices.API).build();
-    }
 
-    @Override
-    public void onConnectionFailed(ConnectionResult result) {
-        Log.i(TAG, "Connection failed: ConnectionResult.getErrorCode() = "
-                + result.getErrorCode());
-    }
-
-    @Override
-    public void onConnected(Bundle arg0) {
-
-        // Once connected with google api, get the location
-        getLocation();
-    }
-
-    @Override
-    public void onConnectionSuspended(int arg0) {
-        mGoogleApiClient.connect();
-    }
 
     /**
      * Method to display the location on UI
-     * */
+     */
     private void getLocation() {
 
         if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED && ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
@@ -247,28 +337,39 @@ public class MainActivity extends AppCompatActivity implements GoogleApiClient.C
             // for ActivityCompat#requestPermissions for more details.
             return;
         }
-        mLastLocation = LocationServices.FusedLocationApi
-                .getLastLocation(mGoogleApiClient);
 
-        if (mLastLocation != null) {
-            double latitude = mLastLocation.getLatitude();
-            double longitude = mLastLocation.getLongitude();
+        LocationManager locationManager = (LocationManager) this.getSystemService(Context.LOCATION_SERVICE);
 
-            locationAsText = latitude + ", " + longitude;
+        if (locationManager.getLastKnownLocation(LocationManager.GPS_PROVIDER) != null) {
+            location = locationManager.getLastKnownLocation(LocationManager.GPS_PROVIDER);
+        }
+        if (locationManager.getLastKnownLocation(LocationManager.NETWORK_PROVIDER) != null) {
+            location = locationManager.getLastKnownLocation(LocationManager.NETWORK_PROVIDER);
+        }
+        if (locationManager.getLastKnownLocation(LocationManager.PASSIVE_PROVIDER) != null) {
+            location = locationManager.getLastKnownLocation(LocationManager.PASSIVE_PROVIDER);
+        }
+
+
+        if (location != null) {
+            double latitude = location.getLatitude();
+            double longitude = location.getLongitude();
+
+            locationAsText = Double.toString(latitude).substring(0, 4) + "," + Double.toString(longitude).substring(0,4);
 
             //lblLocation.setText(latitude + ", " + longitude);
 
         } else {
 
             //lblLocation
-              //      .setText("(Couldn't get the location. Make sure location is enabled on the device)");
+            //      .setText("(Couldn't get the location. Make sure location is enabled on the device)");
         }
     }
 
 
     /**
      * Method to verify google play services on the device
-     * */
+     */
     private boolean checkPlayServices() {
         int resultCode = GooglePlayServicesUtil
                 .isGooglePlayServicesAvailable(this);
@@ -291,7 +392,18 @@ public class MainActivity extends AppCompatActivity implements GoogleApiClient.C
 
         String searchWord = seachWord.getText().toString();
 
+        if(searchWord.length()<2)
+            return;
+
         getLocation();
+
+        //if(dialog!=null)
+          //  dialog.dismiss();
+
+
+        dialog.show();
+
+        //dialog = ProgressDialog.show(getBaseContext(), "Loading", "Please wait...", true);
 
         new DownloadWebpageTask().execute(searchWord);
     }
