@@ -87,8 +87,6 @@ public class MainActivity extends AppCompatActivity {
             // display error
         }
 
-        // LocationManager locationManager = (LocationManager) getSystemService(Context.LOCATION_SERVICE);
-
         dialog = ProgressDialog.show(this, "Loading", "Please wait...", true);
 
         dialog.dismiss();
@@ -397,13 +395,7 @@ public class MainActivity extends AppCompatActivity {
 
         getLocation();
 
-        //if(dialog!=null)
-          //  dialog.dismiss();
-
-
         dialog.show();
-
-        //dialog = ProgressDialog.show(getBaseContext(), "Loading", "Please wait...", true);
 
         new DownloadWebpageTask().execute(searchWord);
     }
